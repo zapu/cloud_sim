@@ -1,0 +1,15 @@
+Debug/
+Release/
+Thumbs.db
+ipch/
+*.suo
+*.sdf
+*.opensdf
+*.orig
+*.exe
+*.dll
+*.ilk
+*.pdb
+*.exp
+*.lib
+*.user
