@@ -2,6 +2,7 @@ Debug/
 Release/
 Thumbs.db
 ipch/
+output/
 *.suo
 *.sdf
 *.opensdf

@@ -10,7 +10,8 @@ struct Job {
 
 	bool hasSubmitted(Node* node);
 	void submit(Node* node, int hash);
-
+	void removeFromSet();
+	void insertToSet();
 	int id;
 	bool done;
 
@@ -40,6 +41,8 @@ struct Node {
 
 	float getCorrectnessScaled();
 	float getCorrectnessScaledRandom();
+
+	void setCorrectness(float new_cor);
 };
 
 
