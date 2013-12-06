@@ -6,7 +6,8 @@
 #include <set>
 #include <assert.h>
 
-int total_market_correctness = 0;
+omp_lock_t total_market_write_lock;
+float total_market_correctness = 0;
 
 int lastJobId = 0;
 int lastNodeId = 0;
@@ -30,6 +31,8 @@ struct SetCompare
 };
 
 std::vector<Node> nodes;
+
+omp_lock_t jobs_lock;
 std::set<Job*, SetCompare> jobs;
 
 template<class T>
@@ -111,19 +114,21 @@ float Node::getCorrectnessScaled()
 		return 0.0f;
 	}
 
-	return (float)correctness / total_market_correctness;
+	return clamp(correctness / total_market_correctness, 0.0f, 1.0f);
 }
 
 float Node::getCorrectnessScaledRandom()
 {
-	return clamp(getCorrectnessScaled() + getRand(-0.1f, 0.1f), 0.0f, 1.0f);
+	return clamp(getCorrectnessScaled() + getRand(0.0f, 0.1f), 0.0f, 1.0f);
 }
 
 void Node::setCorrectness( float new_cor )
 {
 	correctness = new_cor;
 	if(correctness > total_market_correctness) {
+		omp_set_lock(&total_market_write_lock);
 		total_market_correctness = correctness;
+		omp_unset_lock(&total_market_write_lock);
 	}
 }
 
@@ -132,10 +137,18 @@ Job* findJob(Node* node)
 	float correctness = node->getCorrectnessScaled();
 
 	Job search;
-	search.id = INT_MAX;
+	search.id = 5000;
 	search.assumed_correctness_sum = 1.0f - correctness;
+	if(search.assumed_correctness_sum <= 0) {
+		search.assumed_correctness_sum = 1e-6f;
+	}
 
-	auto it = std::upper_bound(jobs.begin(), jobs.end(), &search);
+	auto it = std::lower_bound(jobs.begin(), jobs.end(), &search, SetCompare());
+
+	if(it != jobs.end()) {
+		Job* job = *it;
+		while(0);
+	}
 
 	for(it; it != jobs.end(); ++it) {
 		Job* job = *it;
@@ -166,20 +179,19 @@ void handleNode(Node* node)
 	}
 
 	if(!node->current_job) {
-		#pragma omp critical 
-		{
-			Job* job = findJob(node);
-			if(job) {
-				float corr = node->getCorrectnessScaledRandom();
-				job->removeFromSet();
+		omp_set_lock(&jobs_lock);
+		Job* job = findJob(node);
+		if(job) {
+			float corr = node->getCorrectnessScaledRandom();
+			job->removeFromSet();
 
-				job->assumed_correctness_sum += corr;
-				job->assumed_correctness[node] = corr;
+			job->assumed_correctness_sum += corr;
+			job->assumed_correctness[node] = corr;
 
-				job->insertToSet();
-				node->current_job = job;
-			}
+			job->insertToSet();
+			node->current_job = job;
 		}
+		omp_unset_lock(&jobs_lock);
 
 		if(!node->current_job) {
 			return;
@@ -191,11 +203,10 @@ void handleNode(Node* node)
 	node->worked_for++;
 
 	if(--node->work_scale == 0) {
-#pragma omp critical
-		{
-			Job* job = node->current_job;
-			job->submit(node, 0);
-		}
+		Job* job = node->current_job;
+		omp_set_lock(&jobs_lock);
+		job->submit(node, 0);
+		omp_unset_lock(&jobs_lock);
 
 		node->current_job = NULL;
 	}
@@ -209,13 +220,20 @@ void printjobs()
 }
 
 int main() {
+	omp_init_lock(&total_market_write_lock);
+	omp_init_lock(&jobs_lock);
+
+	omp_set_num_threads(1);
+
 	srand(0);
 
 	int tickNum = 0;
 
-	nodes.resize(100);
-	for(int i = 0; i < 11000; i++) {
-		jobs.insert(new Job());
+	nodes.resize(10);
+	for(int i = 0; i < 100; i++) {
+		Job* job = new Job();
+		//job->assumed_correctness_sum = getRand(0.0f, 0.1f);
+		jobs.insert(job);
 	}
 
 	std::cout << "Init done." << std::endl;
@@ -224,7 +242,7 @@ int main() {
 	//fprintf(pipe, "set terminal png crop size 640,480\n");
 	fprintf(pipe, "set terminal wx\n");
 	fprintf(pipe, "set output \"%s\"\n", "output/output.png");
-	fprintf(pipe, "plot '-' with lines\n");
+	fprintf(pipe, "plot '-' using 1:2 with lines \n");
 
 	while(tickNum < 1000) {
 #pragma omp parallel for
@@ -242,4 +260,7 @@ int main() {
 	fprintf(pipe, "e\n");
 	fflush(pipe);
 	_pclose(pipe);
+
+	omp_destroy_lock(&total_market_write_lock);
+	omp_destroy_lock(&jobs_lock);
 }
