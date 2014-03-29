@@ -223,14 +223,12 @@ int main() {
 	omp_init_lock(&total_market_write_lock);
 	omp_init_lock(&jobs_lock);
 
-	omp_set_num_threads(1);
-
 	srand(0);
 
 	int tickNum = 0;
 
-	nodes.resize(10);
-	for(int i = 0; i < 100; i++) {
+	nodes.resize(100);
+	for(int i = 0; i < 10000; i++) {
 		Job* job = new Job();
 		//job->assumed_correctness_sum = getRand(0.0f, 0.1f);
 		jobs.insert(job);
