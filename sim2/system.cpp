@@ -28,6 +28,10 @@ Result* Job::workDone( AssumedResult* res, int hash )
 	m_assumedResults.erase(res->node);
 	m_assumedCorrectness -= res->correctness;
 	assert(m_assumedCorrectness >= -0.01f);
+	if(m_bestCorrectness >= 1.0f) {
+		//This job was already done, this is late send (?)
+		return NULL;
+	}
 
 	Result* result = new Result();
 	result->hash = hash;
@@ -46,6 +50,16 @@ Result* Job::workDone( AssumedResult* res, int hash )
 
 	if(resultCor > m_bestCorrectness) {
 		m_bestCorrectness = resultCor;
+	}
+
+	if(m_bestCorrectness >= 1.0f) {
+		//This job is done now, add trust to all participants
+		for(auto it = m_results.begin(); it != m_results.end(); ++it) {
+			auto res = it->second;
+			auto node = res->node;
+
+			node->m_trust += m_bestCorrectness - res->correctness;
+		}
 	}
 
 	return result;
@@ -218,7 +232,7 @@ void Project::simulate()
 			addNode(*it);
 		}
 
-		if(jobsDone >= m_jobs.size()) {
+		if(jobsDone >= (int)m_jobs.size()) {
 			break;
 		}
 	}
