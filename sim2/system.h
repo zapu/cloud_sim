@@ -95,6 +95,8 @@ public:
 
 	void addNode(Node* node);
 
+	void updateTrust( Node* node );
+
 	Job* findJobForNode(Node* node);
 	float getTrust(Node* node);
 

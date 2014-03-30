@@ -96,8 +96,10 @@ void Node::startJob( Job* job, float corr, uint64_t currentTick )
 void Node::endJob()
 {
 	auto res = m_currentWork->job->workDone(m_currentWork, 0);
-	m_results.push_back(res);
-	m_resultsJob.insert(res->job);
+	if(res) {
+		m_results.push_back(res);
+		m_resultsJob.insert(res->job);
+	}
 	m_currentWork = NULL;
 }
 
@@ -137,9 +139,8 @@ Project::Project()
 void Project::addNode( Node* node )
 {
 	m_nodes.insert(node);
-	if(node->m_trust > m_bestTrust) {
-		m_bestTrust = node->m_trust;
-	}
+	updateTrust(node);
+
 }
 
 Job* Project::findJobForNode( Node* node )
@@ -183,22 +184,39 @@ float Project::getTrust( Node* node )
 	if(m_bestTrust == 0.0f) {
 		return 0.0f;
 	}
+
+	assert(node->m_trust <= m_bestTrust);
 	return node->m_trust / m_bestTrust;
 }
 
+void Project::updateTrust( Node* node )
+{
+	if(node->m_trust > m_bestTrust) {
+		m_bestTrust = node->m_trust;
+	}
+}
+
+#include "../gnuplot-iostream/gnuplot-iostream.h"
+
 void Project::simulate()
 {
+	Gnuplot gp;
+
+	std::vector<std::pair<uint64_t, float> > xy_pts_A;
+
 	uint64_t currentTick = 0;
 	int resultsSent = 0;
 	int jobsDone = 0;
 
-	for(;;) {
-		std::set<Node*> nodesToReinsert;
+	auto node_it = m_nodes.begin();
+	std::advance(node_it, 2);
+	Node* node = *node_it;
+
+	std::set<Node*> nodesToReinsert;
+	for(;; currentTick++) {
 		for(auto it = m_nodes.begin(); it != m_nodes.end(); ) {
 			auto node = *it;
 			if(node->m_nextActionTime > currentTick) {
-				currentTick = node->m_nextActionTime;
-				printf("tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
 				break;
 			}
 
@@ -208,6 +226,7 @@ void Project::simulate()
 				m_jobs.erase(job_it);
 				
 				node->endJob();
+				updateTrust(node);
 				m_jobs.insert(currentJob);
 				resultsSent++;
 				if(currentJob->m_bestCorrectness >= 1.0f) {
@@ -228,13 +247,31 @@ void Project::simulate()
 			nodesToReinsert.insert(node);
 		}
 
-		for(auto it = nodesToReinsert.begin(); it != nodesToReinsert.end(); ++it) {
-			addNode(*it);
+		if(!nodesToReinsert.empty()) {
+			for(auto it = nodesToReinsert.begin(); it != nodesToReinsert.end(); ++it) {
+				addNode(*it);
+			}
+
+			nodesToReinsert.clear();
 		}
+
+		xy_pts_A.push_back(std::pair<uint64_t, float>(currentTick, getTrust(node)));
+
+		printf("tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
 
 		if(jobsDone >= (int)m_jobs.size()) {
 			break;
 		}
 	}
+
 	printf("DONE, after tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
+
+	gp << "plot" << gp.file1d(xy_pts_A) << "with lines title 'aa'" << std::endl;
+
+#ifdef _WIN32
+	// For Windows, prompt for a keystroke before the Gnuplot object goes out of scope so that
+	// the gnuplot window doesn't get closed.
+	std::cout << "Press enter to exit." << std::endl;
+	std::cin.get();
+#endif
 }
