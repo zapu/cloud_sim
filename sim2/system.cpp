@@ -90,7 +90,7 @@ void Node::startJob( Job* job, float corr, uint64_t currentTick )
 
 	m_currentWork = assumed;
 
-	m_nextActionTime = currentTick + 1 + (uint64_t)(10.f * job->m_difficulty * (1.0f - m_performance));
+	m_nextActionTime = currentTick + 1 + (uint64_t)(100.f * job->m_difficulty * (1.0f - m_performance));
 }
 
 void Node::endJob()
@@ -209,8 +209,8 @@ void Project::simulate()
 	int jobsDone = 0;
 
 	auto node_it = m_nodes.begin();
-	std::advance(node_it, 2);
-	Node* node = *node_it;
+	std::advance(node_it, 1);
+	Node* tested_node = *node_it;
 
 	std::set<Node*> nodesToReinsert;
 	for(;; currentTick++) {
@@ -220,17 +220,27 @@ void Project::simulate()
 				break;
 			}
 
+			m_nodes.erase(it++);
+
 			if(node->m_currentWork) {
 				Job* currentJob = node->m_currentWork->job;
 				auto job_it = m_jobs.find(currentJob);
 				m_jobs.erase(job_it);
 				
 				node->endJob();
-				updateTrust(node);
+
 				m_jobs.insert(currentJob);
+
 				resultsSent++;
 				if(currentJob->m_bestCorrectness >= 1.0f) {
 					jobsDone++;
+					for(auto node_it = currentJob->m_results.begin(); node_it != currentJob->m_results.end(); ++node_it) {
+						updateTrust(node_it->second->node);
+					}
+				}
+
+				if(node == tested_node) {
+					printf("node hands out work, now trust %g\n", getTrust((tested_node)));
 				}
 			}
 
@@ -243,7 +253,6 @@ void Project::simulate()
 				node->m_nextActionTime = currentTick + 1;
 			}
 			
-			m_nodes.erase(it++);
 			nodesToReinsert.insert(node);
 		}
 
@@ -255,9 +264,9 @@ void Project::simulate()
 			nodesToReinsert.clear();
 		}
 
-		xy_pts_A.push_back(std::pair<uint64_t, float>(currentTick, getTrust(node)));
+		xy_pts_A.push_back(std::pair<uint64_t, float>(currentTick, getTrust(tested_node)));
 
-		printf("tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
+		printf("%g tick %lld (%d, %d)\n", getTrust(tested_node), currentTick, jobsDone, resultsSent);
 
 		if(jobsDone >= (int)m_jobs.size()) {
 			break;

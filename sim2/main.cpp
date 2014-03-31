@@ -13,10 +13,10 @@ int main() {
 		project.m_jobs.insert(job);
 	}
 
-	for(int i = 0; i < 10; i++) {
+	for(int i = 0; i < 100; i++) {
 		auto node = new Node();
 		node->m_performance = randf();
-		node->m_trust = getRand(0.0f, 0.1f);
+		node->m_trust = randf();
 		project.addNode(node);
 	}
 
