@@ -76,9 +76,10 @@ public:
 
 	std::unordered_map<Node*, AssumedResult*> m_assumedResults;
 
-
 	//Sum of assumed results correctness
 	float m_assumedCorrectness;
+
+	bool m_active;
 };
 
 struct JobCompare {
@@ -104,6 +105,7 @@ public:
 	std::set<Job*, JobCompare> m_jobs;
 
 	void simulate();
+	void activateJob();
 protected:
 	float m_bestTrust;
 };

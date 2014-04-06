@@ -52,6 +52,20 @@ Result* Job::workDone( AssumedResult* res, int hash )
 		m_bestCorrectness = resultCor;
 	}
 
+	/*
+	//Hand out trust for everyone for this confirmation
+	for(auto it = m_results.begin(); it != m_results.end(); ++it) {
+		auto itres = it->second;
+		auto node = res->node;
+
+		if(itres != result && result->hash == itres->hash) {
+			node->m_trust += result->correctness;
+			result->node->m_trust += itres->correctness;
+		}
+	}
+	*/
+
+	//Job is now done, hand out trust
 	if(m_bestCorrectness >= 1.0f) {
 		//This job is done now, add trust to all participants
 		for(auto it = m_results.begin(); it != m_results.end(); ++it) {
@@ -103,19 +117,28 @@ void Node::endJob()
 	m_currentWork = NULL;
 }
 
+float round2(float f,float pres)
+{
+	return (float) (floor(f*(1.0f/pres) + 0.5)/(1.0f/pres));
+}
+
 bool JobCompare::operator()( const Job* a, const Job* b ) const
 {
 	if(a == b) {
 		return false;
 	}
 
-	float ac = a->getCorrectness();
-	float bc = b->getCorrectness();
-	if(ac == bc) {
-		return a < b;
-	}
+	if(a->m_active == b->m_active) {
+		float ac = a->getCorrectness();
+		float bc = b->getCorrectness();
+		if(ac == bc) {
+			return a < b;
+		}
 
-	return ac > bc;
+		return ac > bc;
+	} else {
+		return a->m_active;
+	}
 }
 
 bool NodeCompare::operator()( const Node* a, const Node* b ) const
@@ -146,11 +169,16 @@ void Project::addNode( Node* node )
 Job* Project::findJobForNode( Node* node )
 {
 	Job search;
-	search.m_assumedCorrectness = clamp(getRand(1.0f, 1.2f) - getTrust(node), 0.0f, 1.0f);
-	
+	search.m_assumedCorrectness = clamp(getRand(1.0f, 1.3f) - getTrust(node), 0.0f, 1.0f);
+	search.m_active = true;
+
 	auto it = std::lower_bound(m_jobs.begin(), m_jobs.end(), &search, JobCompare());
 	for(; it != m_jobs.end(); ++it) {
 		auto obj = *it;
+		if(!obj->m_active) {
+			break;
+		}
+
 		if(obj->getCorrectness() >= 1.0f) {
 			continue;
 		}
@@ -162,31 +190,41 @@ Job* Project::findJobForNode( Node* node )
 		m_jobs.erase(it);
 		return obj;
 	}
-	
-	for(auto rit = m_jobs.rbegin(); rit != m_jobs.rend(); ++rit) {
-		auto obj = *rit;
+
+	search.m_assumedCorrectness = 1.0f;
+
+	it = std::lower_bound(m_jobs.begin(), m_jobs.end(), &search, JobCompare());
+	for(; it != m_jobs.end(); ++it) {
+		auto obj = *it;
+		if(!obj->m_active) {
+			break;
+		}
+
 		if(obj->getCorrectness() >= 1.0f) {
 			continue;
 		}
 
 		if(node->hasSubmitted(obj)) {
-			return NULL;
+			continue;
 		}
 
-		m_jobs.erase(--(rit.base()));
+		m_jobs.erase(it);
 		return obj;
 	}
+
 	return NULL;
 }
 
 float Project::getTrust( Node* node )
 {
+	float constTrust = 0.1f;
+
 	if(m_bestTrust == 0.0f) {
-		return 0.0f;
+		return constTrust;
 	}
 
 	assert(node->m_trust <= m_bestTrust);
-	return node->m_trust / m_bestTrust;
+	return clamp(constTrust + node->m_trust / m_bestTrust, 0.0f, 1.0f);
 }
 
 void Project::updateTrust( Node* node )
@@ -198,18 +236,35 @@ void Project::updateTrust( Node* node )
 
 #include "../gnuplot-iostream/gnuplot-iostream.h"
 
+void Project::activateJob()
+{
+	auto it = m_jobs.rbegin();
+	auto obj = *it;
+
+	if(obj->m_active) {
+		return;
+	}
+
+	m_jobs.erase(--(it.base()));
+	obj->m_active = true;
+	m_jobs.insert(obj);
+}
+
 void Project::simulate()
 {
 	Gnuplot gp;
 
 	std::vector<std::pair<uint64_t, float> > xy_pts_A;
+	std::vector<std::pair<uint64_t, float> > xy_pts_B;
+	std::vector<std::pair<uint64_t, float> > max_trust;
+	std::vector<std::pair<uint64_t, float> > job_gets;
 
 	uint64_t currentTick = 0;
 	int resultsSent = 0;
 	int jobsDone = 0;
 
 	auto node_it = m_nodes.begin();
-	std::advance(node_it, 1);
+	//std::advance(node_it, 1);
 	Node* tested_node = *node_it;
 
 	std::set<Node*> nodesToReinsert;
@@ -233,24 +288,33 @@ void Project::simulate()
 
 				resultsSent++;
 				if(currentJob->m_bestCorrectness >= 1.0f) {
+					activateJob();
 					jobsDone++;
-					for(auto node_it = currentJob->m_results.begin(); node_it != currentJob->m_results.end(); ++node_it) {
-						updateTrust(node_it->second->node);
-					}
+				}
+
+
+				for(auto node_it = currentJob->m_results.begin(); node_it != currentJob->m_results.end(); ++node_it) {
+					updateTrust(node_it->second->node);
 				}
 
 				if(node == tested_node) {
-					printf("node hands out work, now trust %g\n", getTrust((tested_node)));
+					printf("node hands out work, now trust %d %g (%d/%d)\n", currentJob->m_results.size(), getTrust((tested_node)),
+						jobsDone, m_jobs.size());
 				}
 			}
 
 			auto job = findJobForNode(node);
 			if(job) {
-				node->startJob(job, getTrust(node), currentTick);
+				if(node == tested_node) {
+					job_gets.push_back(std::pair<uint64_t, float>(currentTick, getTrust(node)));
+					printf("tick %lld, node gets work, res %d, %g, %g\n", currentTick, job->m_results.size(), job->m_bestCorrectness, job->m_assumedCorrectness);
+				}
+
+				node->startJob(job, getTrust(node) + getRand(0.0f, 0.1f), currentTick);
 				m_jobs.insert(job);
 			} else {
 				//no job - delay a tick
-				node->m_nextActionTime = currentTick + 1;
+				node->m_nextActionTime = currentTick;
 			}
 			
 			nodesToReinsert.insert(node);
@@ -264,9 +328,10 @@ void Project::simulate()
 			nodesToReinsert.clear();
 		}
 
-		xy_pts_A.push_back(std::pair<uint64_t, float>(currentTick, getTrust(tested_node)));
-
-		printf("%g tick %lld (%d, %d)\n", getTrust(tested_node), currentTick, jobsDone, resultsSent);
+		xy_pts_B.push_back(std::pair<uint64_t, float>(currentTick, getTrust(tested_node)));
+		//xy_pts_A.push_back(std::pair<uint64_t, float>(currentTick, tested_node->m_trust));
+		//max_trust.push_back(std::pair<uint64_t, float>(currentTick, m_bestTrust));
+		//printf("%g tick %lld (%d, %d)\n", getTrust(tested_node), currentTick, jobsDone, resultsSent);
 
 		if(jobsDone >= (int)m_jobs.size()) {
 			break;
@@ -275,7 +340,12 @@ void Project::simulate()
 
 	printf("DONE, after tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
 
-	gp << "plot" << gp.file1d(xy_pts_A) << "with lines title 'aa'" << std::endl;
+	gp << "plot";
+	//gp << gp.file1d(xy_pts_A) << "with lines title 'abs_trust', ";
+	//gp << gp.file1d(max_trust) << "with lines title 'max', ";
+	gp << gp.file1d(xy_pts_B) << "with lines title 'trust', ";
+	gp << gp.file1d(job_gets) << "with points title 'jobs'";
+	gp << std::endl;
 
 #ifdef _WIN32
 	// For Windows, prompt for a keystroke before the Gnuplot object goes out of scope so that
