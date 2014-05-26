@@ -257,6 +257,8 @@ void Project::simulate()
 	typedef std::vector<std::pair<uint64_t, float> > plot_t;
 
 	struct plots_t {
+		int id;
+
 		plot_t trust;
 		plot_t trust_abs;
 		plot_t jobs;
@@ -269,8 +271,14 @@ void Project::simulate()
 	int jobsDone = 0;
 
 	auto node_it = m_nodes.begin();
-	Node* tested_node = *node_it;
-	plots[tested_node] = plots_t();
+	std::advance(node_it, 5);
+	
+	for(int i = 0; i < 5; i++) {
+		plots[*node_it] = plots_t();
+		plots[*node_it].id = i;
+
+		node_it++;
+	}
 
 
 	std::set<Node*> nodesToReinsert;
@@ -333,6 +341,8 @@ void Project::simulate()
 			}
 
 			nodesToReinsert.clear();
+
+			std::cout << "tick: " << currentTick << " jobs: " << jobsDone << std::endl;
 		}
 
 		if(jobsDone >= (int)m_jobs.size()) {
@@ -344,12 +354,16 @@ void Project::simulate()
 
 	gp << "plot";
 
-	auto node_plot = &plots.begin()->second;
+	for(auto plotit = plots.begin(); plotit != plots.end(); ++plotit) {
+		auto node_plot = &plotit->second;
 
-	gp << gp.file1d(node_plot->trust_abs) << "with lines title 'abs_trust', ";
-	gp << gp.file1d(node_plot->trust) << "with lines title 'trust', ";
-	gp << gp.file1d(node_plot->jobs) << "with points title 'jobs'";
+		//gp << gp.file1d(node_plot->trust_abs) << "with lines title 'abs_trust_" << node_plot->id << "', ";
+		gp << gp.file1d(node_plot->trust) << "with lines title 'trust_" << node_plot->id << "', ";
+		//gp << gp.file1d(node_plot->jobs) << "with points title 'jobs_" << node_plot->id << "', ";
+	}
+
 	gp << std::endl;
+
 
 #ifdef _WIN32
 	// For Windows, prompt for a keystroke before the Gnuplot object goes out of scope so that
