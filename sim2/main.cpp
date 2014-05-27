@@ -10,7 +10,7 @@ Project project;
 int main() {
 	srand(1);
 
-	for(int i = 0; i < 1500; i++) {
+	for(int i = 0; i < 8500; i++) {
 		auto job = new Job();
 		job->m_difficulty = randf();
 		job->m_active = i < 250;

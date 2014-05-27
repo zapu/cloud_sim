@@ -52,19 +52,6 @@ Result* Job::workDone( AssumedResult* res, int hash )
 		m_bestCorrectness = resultCor;
 	}
 
-	/*
-	//Hand out trust for everyone for this confirmation
-	for(auto it = m_results.begin(); it != m_results.end(); ++it) {
-		auto itres = it->second;
-		auto node = res->node;
-
-		if(itres != result && result->hash == itres->hash) {
-			node->m_trust += result->correctness;
-			result->node->m_trust += itres->correctness;
-		}
-	}
-	*/
-
 	//Job is now done, hand out trust
 	if(m_bestCorrectness >= 1.0f) {
 		//This job is done now, add trust to all participants
@@ -72,7 +59,9 @@ Result* Job::workDone( AssumedResult* res, int hash )
 			auto res = it->second;
 			auto node = res->node;
 
-			node->m_trust += m_bestCorrectness - res->correctness;
+			if(res->hash == hash) {
+				node->m_trust += m_bestCorrectness - res->correctness;
+			}
 		}
 	}
 
@@ -86,6 +75,8 @@ Node::Node()
 
 	m_nextActionTime = 0;
 	m_currentWork = NULL;
+
+	m_falseRatio = 0.0f;
 }
 
 bool Node::hasSubmitted( Job* job )
@@ -109,7 +100,15 @@ void Node::startJob( Job* job, float corr, uint64_t currentTick )
 
 void Node::endJob()
 {
-	auto res = m_currentWork->job->workDone(m_currentWork, 0);
+	int hash = 0;
+
+	if(m_falseRatio > 0.0f) {
+		if(randf() < m_falseRatio) {
+			hash = rand();
+		}
+	}
+
+	auto res = m_currentWork->job->workDone(m_currentWork, hash);
 	if(res) {
 		m_results.push_back(res);
 		m_resultsJob.insert(res->job);
@@ -273,7 +272,16 @@ void Project::simulate()
 	auto node_it = m_nodes.begin();
 	std::advance(node_it, 5);
 	
-	for(int i = 0; i < 5; i++) {
+	//(*node_it)->m_falseRatio = 0.3f;
+
+	auto nodee = (*node_it);
+	m_nodes.erase(node_it++);
+	nodee->m_nextActionTime = 200;
+	plots[nodee] = plots_t();
+	plots[nodee].id = 5;
+	m_nodes.insert(nodee);
+
+	for(int i = 0; i < 4; i++) {
 		plots[*node_it] = plots_t();
 		plots[*node_it].id = i;
 
@@ -363,7 +371,7 @@ void Project::simulate()
 
 		//gp << gp.file1d(node_plot->trust_abs) << "with lines title 'abs_trust_" << node_plot->id << "', ";
 		gp << gp.file1d(node_plot->trust) << "with lines title 'trust_" << node_plot->id << "', ";
-		gp << gp.file1d(node_plot->jobs) << "with points title 'jobs_" << node_plot->id << "', ";
+		//gp << gp.file1d(node_plot->jobs) << "with points title 'jobs_" << node_plot->id << "', ";
 	}
 
 	gp << std::endl;

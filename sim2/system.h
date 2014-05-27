@@ -32,6 +32,8 @@ public:
 
 	float m_trust;
 
+	float m_falseRatio;
+
 	AssumedResult* m_currentWork;
 
 	bool hasSubmitted(Job* job);
