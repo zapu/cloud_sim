@@ -320,7 +320,10 @@ void Project::simulate()
 					node_plot->jobs.push_back(std::pair<uint64_t, float>(currentTick, getTrust(node)));
 				}
 
-				node->startJob(job, getTrust(node) + getRand(0.0f, 0.1f), currentTick);
+				float corr = std::max<float>(0.0f, getTrust(node) + getRand(-0.1f, 0.1f));
+				corr = std::min<float>(corr, 0.99f);
+
+				node->startJob(job, corr, currentTick);
 				m_jobs.insert(job);
 			} else {
 				//no job - delay a tick
@@ -328,12 +331,13 @@ void Project::simulate()
 			}
 			
 			nodesToReinsert.insert(node);
-
-			if(node_plot) {
-				node_plot->trust.push_back(std::pair<uint64_t, float>(currentTick, getTrust(node)));
-				node_plot->trust_abs.push_back(std::pair<uint64_t, float>(currentTick, node->m_trust));
-			}
 		}
+
+		for(auto plotit = plots.begin(); plotit != plots.end(); ++plotit) {
+			plotit->second.trust.push_back(std::pair<uint64_t, float>(currentTick, getTrust(plotit->first)));
+			plotit->second.trust_abs.push_back(std::pair<uint64_t, float>(currentTick, plotit->first->m_trust));
+		}
+
 
 		if(!nodesToReinsert.empty()) {
 			for(auto it = nodesToReinsert.begin(); it != nodesToReinsert.end(); ++it) {
@@ -359,7 +363,7 @@ void Project::simulate()
 
 		//gp << gp.file1d(node_plot->trust_abs) << "with lines title 'abs_trust_" << node_plot->id << "', ";
 		gp << gp.file1d(node_plot->trust) << "with lines title 'trust_" << node_plot->id << "', ";
-		//gp << gp.file1d(node_plot->jobs) << "with points title 'jobs_" << node_plot->id << "', ";
+		gp << gp.file1d(node_plot->jobs) << "with points title 'jobs_" << node_plot->id << "', ";
 	}
 
 	gp << std::endl;
