@@ -79,6 +79,7 @@ Node::Node()
 	m_performance = 0.0f;
 
 	m_nextActionTime = 0;
+	m_lastActionTime = 0;
 	m_currentWork = NULL;
 
 	m_falseRatio = 0.0f;
@@ -281,14 +282,14 @@ void Project::simulate()
 
 	auto nodee = (*node_it);
 	m_nodes.erase(node_it++);
-	nodee->m_nextActionTime = 200;
+	//nodee->m_lastActionTime = 250;
 	plots[nodee] = plots_t();
-	plots[nodee].id = 5;
+	plots[nodee].id = 1;
 	m_nodes.insert(nodee);
 
-	for(int i = 0; i < 4; i++) {
+	for(int i = 1; i < 3; i++) {
 		plots[*node_it] = plots_t();
-		plots[*node_it].id = i;
+		plots[*node_it].id = i+1;
 
 		node_it++;
 	}
@@ -300,6 +301,10 @@ void Project::simulate()
 			auto node = *it;
 			if(node->m_nextActionTime > currentTick) {
 				break;
+			}
+
+			if(node->m_lastActionTime != 0 && node->m_lastActionTime < currentTick && !node->m_currentWork) {
+				continue;
 			}
 
 			m_nodes.erase(it++);
@@ -324,6 +329,10 @@ void Project::simulate()
 
 				for(auto node_it = currentJob->m_results.begin(); node_it != currentJob->m_results.end(); ++node_it) {
 					updateTrust(node_it->second->node);
+				}
+
+				if(node->m_lastActionTime != 0 && node->m_lastActionTime < currentTick) {
+					continue;
 				}
 			}
 
@@ -376,8 +385,8 @@ void Project::simulate()
 		auto node_plot = &plotit->second;
 
 		//gp << gp.file1d(node_plot->trust_abs) << "with lines title 'abs_trust_" << node_plot->id << "', ";
-		gp << gp.file1d(node_plot->trust) << "with lines title 'trust_" << node_plot->id << "', ";
-		//gp << gp.file1d(node_plot->jobs) << "with points title 'jobs_" << node_plot->id << "', ";
+		gp << gp.file1d(node_plot->trust) << "with lines title 'Node " << node_plot->id << "', ";
+		//gp << gp.file1d(node_plot->jobs) << "with points title '' lt rgb \"black\", ";
 	}
 
 	gp << std::endl;

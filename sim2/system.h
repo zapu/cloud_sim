@@ -22,6 +22,7 @@ public:
 	//Next action time - Node waits till nextActionTime
 	//before doing next thing: starting of finishing computation
 	uint64_t m_nextActionTime;
+	uint64_t m_lastActionTime;
 
 	//How fast the node is: 0.0f (slowest) - 1.0f (fastest)
 	float m_performance;
