@@ -63,6 +63,11 @@ Result* Job::workDone( AssumedResult* res, int hash )
 				node->m_trust += m_bestCorrectness - res->correctness;
 			}
 		}
+
+		if(hash != 0) {
+			printf("lolfail");
+			exit(1);
+		}
 	}
 
 	return result;
@@ -363,6 +368,7 @@ void Project::simulate()
 	}
 
 	printf("DONE, after tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
+	printf("job ratio: %g\n", (float)resultsSent / jobsDone);
 
 	gp << "plot";
 
