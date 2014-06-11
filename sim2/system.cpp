@@ -65,7 +65,7 @@ Result* Job::workDone( AssumedResult* res, int hash )
 		}
 
 		if(hash != 0) {
-			printf("lolfail");
+			std::cout << "Incorrect result got accepted." << std::endl;
 			exit(1);
 		}
 	}

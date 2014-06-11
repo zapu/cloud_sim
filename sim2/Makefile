@@ -1,5 +1,5 @@
 SOURCES = main.cpp system.cpp tools.cpp
-LIBS = -lboost_iostreams -lboost_system -lboost_filesystem
+LIBS = -lboost_iostreams -lboost_system -lboost_filesystem -lboost_program_options
 FLAGS = -static-libstdc++ -std=c++11 -Ofast
 
 all: a.out
