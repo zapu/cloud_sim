@@ -261,6 +261,8 @@ void Project::simulate()
 
 	typedef std::vector<std::pair<uint64_t, float> > plot_t;
 
+	plot_t avg_confs;
+
 	struct plots_t {
 		int id;
 
@@ -317,12 +319,14 @@ void Project::simulate()
 				auto job_it = m_jobs.find(currentJob);
 				m_jobs.erase(job_it);
 				
+				bool done = currentJob->m_bestCorrectness >= 1.0f;
+
 				node->endJob();
 
 				m_jobs.insert(currentJob);
 
 				resultsSent++;
-				if(currentJob->m_bestCorrectness >= 1.0f) {
+				if(!done && currentJob->m_bestCorrectness >= 1.0f) {
 					activateJob();
 					jobsDone++;
 				}
@@ -371,13 +375,18 @@ void Project::simulate()
 			std::cout << "tick: " << currentTick << " jobs: " << jobsDone << std::endl;
 		}
 
+		if(jobsDone > 0) {
+			avg_confs.push_back(std::pair<uint64_t, float>(currentTick, (float)resultsSent / jobsDone));
+		}
+
 		if(jobsDone >= (int)m_jobs.size()) {
 			break;
 		}
 	}
 
-	printf("DONE, after tick %lld (%d, %d)\n", currentTick, jobsDone, resultsSent);
-	printf("job ratio: %g\n", (float)resultsSent / jobsDone);
+	printf("DONE, after tick %lld (jobs: %d, results total: %d)\n", currentTick, jobsDone, resultsSent);
+	printf("correctness ratio: %g\n", (float)resultsSent / jobsDone);
+
 
 	gp << "plot";
 
@@ -386,6 +395,8 @@ void Project::simulate()
 
 		//gp << gp.file1d(node_plot->trust_abs) << "with lines title 'abs_trust_" << node_plot->id << "', ";
 		gp << gp.file1d(node_plot->trust) << "with lines title 'Node " << node_plot->id << "', ";
+		//std::cout << gp.file1d(node_plot->trust) << "with lines title 'Node " << node_plot->id << "', ";
+		//gp << gp.file1d(avg_confs) << "with lines title 'Confirmation count', ";
 		//gp << gp.file1d(node_plot->jobs) << "with points title '' lt rgb \"black\", ";
 	}
 

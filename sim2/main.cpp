@@ -14,12 +14,13 @@ namespace prog_opt = boost::program_options;
 int main(int argc, char** argv) {
 	prog_opt::options_description option_desc("Allowed options");
 	option_desc.add_options()
-		("help", "produce help message")
-		("nodes", prog_opt::value<int>()->default_value(100), "Node count")
-		("jobs", prog_opt::value<int>()->default_value(5000), "Job count")
-		("false", prog_opt::value<float>()->default_value(0), "Ratio of dishonest nodes returning random false results")
-		("dishonest", prog_opt::value<float>()->default_value(0), "Ratio of dishonest nodes")
+		("help,h", "produce help message")
+		("nodes", prog_opt::value<int>()->default_value(1000), "Node count")
+		("jobs", prog_opt::value<int>()->default_value(15000), "Job count")
+		("false", prog_opt::value<float>()->default_value(0), "Probability of a dishonest node returning false result (0 - node always returns correct, 1 - node always returns false)")
+		("dishonest", prog_opt::value<float>()->default_value(0), "Ratio of dishonest nodes (0 - no dishonest nodes, 1 - whole network is dishonest)")
 		("static_perf", "Static performance of nodes.")
+		("srand", prog_opt::value<int>()->default_value(1), "Random seed")
 	;
 
 	prog_opt::variables_map opt_map;
@@ -36,18 +37,19 @@ int main(int argc, char** argv) {
 		return 1;
 	}
 
-	srand(1);
+	srand(opt_map["srand"].as<int>());
 
 	int node_count = opt_map["nodes"].as<int>();
 	int job_count = opt_map["jobs"].as<int>();
 	float ratio = opt_map["false"].as<float>();
 	int dishonestCount = opt_map["dishonest"].as<float>() * node_count;
-	bool perf = opt_map.count("static_perf");
+	bool perf = opt_map.count("static_perf") > 0;
 
 	for(int i = 0; i < job_count; i++) {
 		auto job = new Job();
 		job->m_difficulty = randf();
-		job->m_active = i < 250;
+		//job->m_active = i < 250;
+		job->m_active = true;
 		project.m_jobs.insert(job);
 	}
 
