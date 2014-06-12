@@ -162,6 +162,9 @@ bool NodeCompare::operator()( const Node* a, const Node* b ) const
 Project::Project()
 {
 	m_bestTrust = 0.0f;
+
+	quiet = false;
+	nograph = false;
 }
 
 void Project::addNode( Node* node )
@@ -372,7 +375,9 @@ void Project::simulate()
 
 			nodesToReinsert.clear();
 
-			std::cout << "tick: " << currentTick << " jobs: " << jobsDone << std::endl;
+			if(!quiet) {
+				std::cout << "tick: " << currentTick << " jobs: " << jobsDone << std::endl;
+			}
 		}
 
 		if(jobsDone > 0) {
@@ -387,6 +392,10 @@ void Project::simulate()
 	printf("DONE, after tick %lld (jobs: %d, results total: %d)\n", currentTick, jobsDone, resultsSent);
 	printf("correctness ratio: %g\n", (float)resultsSent / jobsDone);
 
+
+	if(nograph) {
+		return;
+	}
 
 	gp << "plot";
 

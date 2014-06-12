@@ -109,6 +109,9 @@ public:
 
 	void simulate();
 	void activateJob();
+
+	bool quiet;
+	bool nograph;
 protected:
 	float m_bestTrust;
 };

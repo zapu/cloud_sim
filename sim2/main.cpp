@@ -7,9 +7,9 @@
 #define BOOST_ALL_DYN_LINK
 #include <boost/program_options.hpp>
 
-Project project;
-
 namespace prog_opt = boost::program_options;
+
+void start(const prog_opt::variables_map& opt_map, int num);
 
 int main(int argc, char** argv) {
 	prog_opt::options_description option_desc("Allowed options");
@@ -21,6 +21,8 @@ int main(int argc, char** argv) {
 		("dishonest", prog_opt::value<float>()->default_value(0), "Ratio of dishonest nodes (0 - no dishonest nodes, 1 - whole network is dishonest)")
 		("static_perf", "Static performance of nodes.")
 		("srand", prog_opt::value<int>()->default_value(1), "Random seed")
+		("repeat", prog_opt::value<int>()->default_value(1), "Repeat the experiment n times")
+		("quiet", "Do not show progress number after each tick.")
 	;
 
 	prog_opt::variables_map opt_map;
@@ -38,6 +40,14 @@ int main(int argc, char** argv) {
 	}
 
 	srand(opt_map["srand"].as<int>());
+
+	for(int i = 0; i < opt_map["repeat"].as<int>(); i++) {
+		start(opt_map, i);
+	}
+}
+
+void start(const prog_opt::variables_map& opt_map, int num) {
+	Project project;
 
 	int node_count = opt_map["nodes"].as<int>();
 	int job_count = opt_map["jobs"].as<int>();
@@ -64,6 +74,9 @@ int main(int argc, char** argv) {
 		project.addNode(node);
 	}
 
-	std::cout << "Starting simulation with " << node_count << " nodes and " << job_count << " jobs." << std::endl;
+	project.quiet = opt_map.count("quiet") > 0;
+	project.nograph = opt_map["repeat"].as<int>() > 1;
+
+	std::cout << "Starting simulation " << num << " with " << node_count << " nodes and " << job_count << " jobs." << std::endl;
 	project.simulate();
 }
