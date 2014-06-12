@@ -299,9 +299,11 @@ void Project::simulate()
 		node_it++;
 	}
 
+	int noWorkFor = 0;
 
 	std::set<Node*> nodesToReinsert;
 	for(;; currentTick++) {
+		bool foundWork = false;
 		for(auto it = m_nodes.begin(); it != m_nodes.end(); ) {
 			auto node = *it;
 			if(node->m_nextActionTime > currentTick) {
@@ -354,12 +356,22 @@ void Project::simulate()
 
 				node->startJob(job, corr, currentTick);
 				m_jobs.insert(job);
+
+				foundWork = true;
 			} else {
 				//no job - delay a tick
 				node->m_nextActionTime = currentTick;
 			}
 			
 			nodesToReinsert.insert(node);
+		}
+
+		if(!foundWork) {
+			noWorkFor++;
+			if(noWorkFor > 1000) {
+				std::cout << "No jobs assigned for 1000 ticks, bailing out." << std::endl;
+				return;
+			}
 		}
 
 		for(auto plotit = plots.begin(); plotit != plots.end(); ++plotit) {
